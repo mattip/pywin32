@@ -1,5 +1,6 @@
 # Utilities for the pywin32 tests
 import sys
+import os
 import unittest
 import gc
 import winerror
@@ -191,6 +192,23 @@ def check_is_admin():
             # not impl on this platform - must be old - assume is admin
             _is_admin = True
     return _is_admin
+
+# Find a test "fixture" (eg, binary test file) expected to be very close to
+# the test being run.
+def find_test_fixture(basename, extra_dir = "."):
+    # look for the test file in various places
+    candidates = [
+        os.path.dirname(__file__),
+        os.path.dirname(sys.argv[0]),
+        extra_dir,
+        ".",
+    ]
+    for candidate in candidates:
+        fname = os.path.join(candidate, basename)
+        if os.path.isfile(fname):
+            return fname
+    else:
+        raise TestSkipped(f"Can't find test fixture '{fname}'")
 
 
 # If this exception is raised by a test, the test is reported as a 'skip'
