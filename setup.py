@@ -55,6 +55,8 @@ else:
 # manifest.
 static_crt_modules = ["winxpgui"]
 
+IS_PYPY = sys.implementation.name == "pypy"
+
 build_id_patch = build_id
 if not "." in build_id_patch:
     build_id_patch = build_id_patch + ".0"
@@ -447,6 +449,10 @@ class my_build_ext(build_ext):
         if ext.platforms and self.plat_name not in ext.platforms:
             return f"Only available on platforms {ext.platforms}"
 
+        if IS_PYPY and ext.name in ('servicemanager', 'pythonservice',
+                                    'PyISAPI_loader'):
+            return "Cannot build service extensions on PyPy"
+
         # We update the .libraries list with the resolved library name.
         # This is really only so "_d" works.
         ext.libraries = patched_libs
@@ -615,11 +621,11 @@ class my_build_ext(build_ext):
         # need at this stage.
         self._build_scintilla()
         # Copy cpp lib files needed to create Python COM extensions
-        clib_files = (
-            ["win32", "pywintypes%s.lib"],
-            ["win32com", "pythoncom%s.lib"],
-            ["win32com", "axscript%s.lib"],
-        )
+        clib_files = (["win32", "pywintypes%s.lib"],)
+        if not IS_PYPY:
+            clib_files += (['win32com', 'pythoncom%s.lib'],
+                           ['win32com', 'axscript%s.lib'],
+                          )
         for clib_file in clib_files:
             target_dir = os.path.join(self.build_lib, clib_file[0], "libs")
             if not os.path.exists(target_dir):
@@ -2229,6 +2235,14 @@ packages = [
     "isapi",
     "adodbapi",
 ]
+
+if IS_PYPY:
+    # pythomcom needs Py_Initialize
+    # all the others need pythoncom.lib
+    com_extensions = []
+    # win32ui needs PySys_SetArgv, Py_Finalize
+    # all the others need win32ui.lib
+    pythonwin_extensions = []
 
 py_modules = expand_modules("win32\\lib")
 ext_modules = (
