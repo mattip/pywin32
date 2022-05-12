@@ -7,7 +7,8 @@ import unittest
 
 import winerror
 
-##
+IS_PYPY = sys.implementation.name == "pypy"
+
 ## unittest related stuff
 ##
 
@@ -40,25 +41,26 @@ class LeakTestCase(unittest.TestCase):
         # For the COM suite's sake, always ensure we don't leak
         # gateways/interfaces
         from pythoncom import _GetGatewayCount, _GetInterfaceCount
-
-        gc.collect()
-        ni = _GetInterfaceCount()
-        ng = _GetGatewayCount()
+        if not IS_PYPY:
+            gc.collect()
+            ni = _GetInterfaceCount()
+            ng = _GetGatewayCount()
         self.real_test(result)
         # Failed - no point checking anything else
         if result.shouldStop or not result.wasSuccessful():
             return
         self._do_leak_tests(result)
-        gc.collect()
-        lost_i = _GetInterfaceCount() - ni
-        lost_g = _GetGatewayCount() - ng
-        if lost_i or lost_g:
-            msg = "%d interface objects and %d gateway objects leaked" % (
-                lost_i,
-                lost_g,
-            )
-            exc = AssertionError(msg)
-            result.addFailure(self.real_test, (exc.__class__, exc, None))
+        if not IS_PYPY:
+            gc.collect()
+            lost_i = _GetInterfaceCount() - ni
+            lost_g = _GetGatewayCount() - ng
+            if lost_i or lost_g:
+                msg = "%d interface objects and %d gateway objects leaked" % (
+                    lost_i,
+                    lost_g,
+                )
+                exc = AssertionError(msg)
+                result.addFailure(self.real_test, (exc.__class__, exc, None))
 
     def runTest(self):
         assert 0, "not used"
