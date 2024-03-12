@@ -33,6 +33,7 @@ import subprocess
 import sys
 import winreg
 from pathlib import Path
+import sysconfig
 from tempfile import gettempdir
 from typing import Iterable, List, Tuple, Union
 
@@ -54,6 +55,9 @@ else:
 # some modules need a static CRT to avoid problems caused by them having a
 # manifest.
 static_crt_modules = ["winxpgui"]
+
+IS_PYPY = sys.implementation.name == "pypy"
+EXT_SUFFIX = sysconfig.get_config_var("EXT_SUFFIX")
 
 build_id_patch = build_id
 if not "." in build_id_patch:
@@ -447,6 +451,13 @@ class my_build_ext(build_ext):
         if ext.platforms and self.plat_name not in ext.platforms:
             return f"Only available on platforms {ext.platforms}"
 
+        if IS_PYPY and ext.name in (
+            "servicemanager",
+            "pythonservice",
+            "PyISAPI_loader",
+        ):
+            return "Cannot build service extensions on PyPy"
+
         # We update the .libraries list with the resolved library name.
         # This is really only so "_d" works.
         ext.libraries = patched_libs
@@ -615,11 +626,12 @@ class my_build_ext(build_ext):
         # need at this stage.
         self._build_scintilla()
         # Copy cpp lib files needed to create Python COM extensions
-        clib_files = (
-            ["win32", "pywintypes%s.lib"],
-            ["win32com", "pythoncom%s.lib"],
-            ["win32com", "axscript%s.lib"],
-        )
+        clib_files = (["win32", "pywintypes%s.lib"],)
+        if not IS_PYPY:
+            clib_files += (
+                ["win32com", "pythoncom%s.lib"],
+                ["win32com", "axscript%s.lib"],
+            )
         for clib_file in clib_files:
             target_dir = os.path.join(self.build_lib, clib_file[0], "libs")
             if not os.path.exists(target_dir):
@@ -785,7 +797,9 @@ class my_build_ext(build_ext):
             return f"{name}{suffix}.dll"
         # everything else a .pyd - calling base-class might give us a more
         # complicated name, so return a simple one.
-        return f"{name}{suffix}.pyd"
+        if IS_PYPY:
+            # No debug on PyPy, and needs full suffix .pypy39-pp73-win_amd64.pyd
+            return f"{name}{EXT_SUFFIX}"
 
     def get_export_symbols(self, ext):
         if ext.is_regular_dll:
@@ -2229,6 +2243,14 @@ packages = [
     "isapi",
     "adodbapi",
 ]
+
+if IS_PYPY:
+    # pythomcom needs Py_Initialize in com/win32com/src/dllmain.cpp
+    # all the others need pythoncom.lib
+    com_extensions = []
+    # win32ui needs PySys_SetArgv, Py_Finalize
+    # all the others need win32ui.lib
+    pythonwin_extensions = []
 
 py_modules = expand_modules("win32\\lib")
 ext_modules = (

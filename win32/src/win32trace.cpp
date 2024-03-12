@@ -190,7 +190,12 @@ static PyMemberDef PyTraceObject_members[] = {
 static PyTypeObject PyTraceObjectType = {
     PYWIN_OBJECT_HEAD "PyTraceObject", sizeof(PyTraceObject), 0,
     // standard methods
-    PyTraceObject_dealloc, (printfunc)0,
+    PyTraceObject_dealloc,
+#if (PY_VERSION_HEX < 0x03080000)
+    (printfunc)0,
+#else
+    0,
+#endif
     0,  // getattr
     0,  // setattr
     0,  // cmp

@@ -5,6 +5,8 @@ import site
 import subprocess
 import sys
 
+IS_PYPY = sys.implementation.name == "pypy"
+
 # locate the dirs based on where this script is - it may be either in the
 # source tree, or in an installed Python 'Scripts' tree.
 this_dir = os.path.dirname(__file__)
@@ -87,15 +89,16 @@ def main():
         find_and_run(maybes, extras)
 
     # win32com
-    maybes = [
-        os.path.join(directory, "win32com", "test", "testall.py")
-        for directory in [
-            os.path.join(this_dir, "com"),
+    if not IS_PYPY:
+        maybes = [
+            os.path.join(directory, "win32com", "test", "testall.py")
+            for directory in [
+                os.path.join(this_dir, "com"),
+            ]
+            + site_packages
         ]
-        + site_packages
-    ]
-    extras = remains + ["1"]  # only run "level 1" tests in CI
-    find_and_run(maybes, extras)
+        extras = remains + ["1"]  # only run "level 1" tests in CI
+        find_and_run(maybes, extras)
 
     # adodbapi
     if not args.skip_adodbapi:
